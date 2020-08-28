@@ -246,47 +246,113 @@ module Mk⟦DIFC⟧ where
 
 open LIOInterface
 open ⟦LIOInterface⟧
-postulate parametricity : (o : (m : LIOInterface) → Labeled m Bool → LIO m Bool)
-                        → (m₀ m₁ : LIOInterface) → (mᵣ : ⟦LIOInterface⟧ m₀ m₁)
-                        → (l₀ : Labeled m₀ Bool) → (l₁ : Labeled m₁ Bool)
-                        → (lᵣ : Labeledᵣ mᵣ Bool Bool ⟦Bool⟧ l₀ l₁)
-                        → LIOᵣ mᵣ Bool Bool ⟦Bool⟧ (o m₀ l₀) (o m₁ l₁)
 
-_~⟨_⟩Labeled_ : Labeled DIFC Bool → L → Labeled DIFC Bool → Set
-lv₀ ~⟨ ℓ ⟩Labeled lv₁ = labelOf DIFC lv₀ ≡ labelOf DIFC lv₁ × (labelOf DIFC lv₀ ⊑ ℓ → lv₀ ≡ lv₁)
+data Univ : Set where
+  bool : Univ
+  labeled : Univ → Univ
+  lio : Univ → Univ
+
+El : Univ → LIOInterface → Set
+El bool m        = Bool
+El (labeled u) m = Labeled m (El u m)
+El (lio u) m     = LIO m (El u m)
+
+Rel : (u : Univ)
+    → (m₀ : LIOInterface) → (m₁ : LIOInterface)
+    → (mᵣ : ⟦LIOInterface⟧ m₀ m₁)
+    → El u m₀ → El u m₁ → Set
+Rel bool m₀ m₁ mᵣ        = _≡_
+Rel (labeled u) m₀ m₁ mᵣ = Labeledᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
+Rel (lio u) m₀ m₁ mᵣ     = LIOᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
+
+postulate parametricity : (u₀ u₁ : Univ)
+                        → (o : (m : LIOInterface) → El u₀ m → El u₁ m)
+                        → (m₀ m₁ : LIOInterface) → (mᵣ : ⟦LIOInterface⟧ m₀ m₁)
+                        → (i₀ : El u₀ m₀) → (i₁ : El u₀ m₁)
+                        → (iᵣ : Rel u₀ m₀ m₁ mᵣ i₀ i₁)
+                        → Rel u₁ m₀ m₁ mᵣ (o m₀ i₀) (o m₁ i₁)
 
 _~⟨_⟩L_ : L → L → L → Set
 ℓc₀ ~⟨ ℓ ⟩L ℓc₁ = (ℓc₀ ⊑ ℓ) ⊎ (ℓc₁ ⊑ ℓ) → ℓc₀ ≡ ℓc₁
 
-_~⟨_⟩Cfg_ : (Bool ⊎ E) × L → L → (Bool ⊎ E) × L → Set
-(r₀ , ℓc₀) ~⟨ ℓ ⟩Cfg (r₁ , ℓc₁) = (ℓc₀ ~⟨ ℓ ⟩L ℓc₁) × (ℓc₀ ⊑ ℓ × ℓc₁ ⊑ ℓ → r₀ ≡ r₁)
+mutual
+  data _⊢_~⟨_⟩_ : (u : Univ) → El u DIFC → L → El u DIFC → Set where
+    ~bool     : ∀{ℓ : L}{b₀ b₁ : Bool} → b₀ ≡ b₁ → bool ⊢ b₀ ~⟨ ℓ ⟩ b₁
+  
+    ~labeled₀ : ∀{ℓ ℓ' : L}{u : Univ}{v₀ v₁ : El u DIFC}
+              → u ⊢ v₀ ~⟨ ℓ ⟩ v₁
+              → (labeled u) ⊢ (inj₁ v₀ , ℓ') ~⟨ ℓ ⟩ (inj₁ v₁ , ℓ')
+  
+    ~labeled₂ : ∀{ℓ ℓ' : L}{u : Univ}{e : E}
+              → (labeled u) ⊢ (inj₂ e , ℓ') ~⟨ ℓ ⟩ (inj₂ e , ℓ')
+  
+    ~labeled₃ : ∀{ℓ ℓ' : L}{u : Univ}{v₀ v₁ : El u DIFC ⊎ E}
+              → ¬ (ℓ' ⊑ ℓ)
+              → (labeled u) ⊢ (v₀ , ℓ') ~⟨ ℓ ⟩ (v₁ , ℓ')
 
-_~⟨_⟩LIO_ : LIO DIFC Bool → L → LIO DIFC Bool → Set
-lio₀ ~⟨ ℓ ⟩LIO lio₁ = (ℓc₀ ℓc₁ : L) → ℓc₀ ~⟨ ℓ ⟩L ℓc₁ → proj₁ (lio₀ ℓc₀) ~⟨ ℓ ⟩Cfg proj₁ (lio₁ ℓc₁)
+    ~lio      : ∀{ℓ : L}{u : Univ}{lio₀ lio₁ : LIO DIFC (El u DIFC)}
+              → ((ℓc₀ ℓc₁ : L) → ℓc₀ ~⟨ ℓ ⟩L ℓc₁ → u ⊢ proj₁ (lio₀ ℓc₀) ~⟨ ℓ ⟩Cfg proj₁ (lio₁ ℓc₁))
+              → (lio u) ⊢ lio₀ ~⟨ ℓ ⟩ lio₁
+  
+  data _⊢_~⟨_⟩Cfg_ : (u : Univ) → (El u DIFC ⊎ E) × L → L → (El u DIFC ⊎ E) × L → Set where
+    ~cfg₀ : ∀{ℓ : L}{u : Univ}{v₀ v₁ : El u DIFC}{ℓc₀ ℓc₁ : L}
+          → ℓc₀ ~⟨ ℓ ⟩L ℓc₁
+          → ℓc₀ ⊑ ℓ
+          → ℓc₁ ⊑ ℓ
+          → u ⊢ v₀ ~⟨ ℓ ⟩ v₁
+          → u ⊢ (inj₁ v₀ , ℓc₀) ~⟨ ℓ ⟩Cfg (inj₁ v₁ , ℓc₁)
 
-noninterference : (o : (m : LIOInterface) → Labeled m Bool → LIO m Bool)
-                → (lv₀ lv₁ : Labeled DIFC Bool)
-                → (assume : lv₀ ~⟨ ℓ* ⟩Labeled lv₁)
-                → (o DIFC lv₀) ~⟨ ℓ* ⟩LIO (o DIFC lv₁)
-noninterference o lv₀ lv₁ assume ℓc₀ ℓc₁ p = hlp (parametricity o DIFC DIFC ⟦DIFC⟧ lv₀ lv₁ hlp₁ ℓc₀ ℓc₁ hlp₀)
-  where
-    open Mk⟦DIFC⟧ using (Cfgᵣ)
+    ~cfg₁ : ∀{ℓ : L}{u : Univ}{e : E}{ℓc₀ ℓc₁ : L}
+          → ℓc₀ ~⟨ ℓ ⟩L ℓc₁
+          → u ⊢ (inj₂ e , ℓc₀) ~⟨ ℓ ⟩Cfg (inj₂ e , ℓc₁)
 
-    hlp₀ : _
-    hlp₀ with ℓc₀ ⊑d ℓ* | ℓc₁ ⊑d ℓ*
-    hlp₀ | no ¬p | no ¬p₁ = inj₂ (¬p , ¬p₁)
-    hlp₀ | no ¬p | yes p₁ = inj₁ (p (inj₂ p₁))
-    hlp₀ | yes p₁ | r = inj₁ (p (inj₁ p₁))
+    ~cfg₂ : ∀{ℓ : L}{u : Univ}{v₀ v₁ : El u DIFC ⊎ E}{ℓc₀ ℓc₁ : L}
+          → (ℓc₀ ~⟨ ℓ ⟩L ℓc₁)
+          → (¬ (ℓc₀ ⊑ ℓ)) ⊎ (¬ (ℓc₁ ⊑ ℓ))
+          → u ⊢ (v₀ , ℓc₀) ~⟨ ℓ ⟩Cfg (v₁ , ℓc₁)
 
-    ⟦⊎⟧-refl : ∀{A B : Set}{p₀ p₁ : A ⊎ B} → p₀ ≡ p₁ → (_≡_ ⟦⊎⟧ _≡_) p₀ p₁
-    ⟦⊎⟧-refl {p₀ = inj₁ x} refl = ⟦inj₁⟧ refl
-    ⟦⊎⟧-refl {p₀ = inj₂ y} refl = ⟦inj₂⟧ refl
+  ~ℓ*-to-param : (u : Univ) → (x₀ x₁ : El u DIFC) → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁
+  ~ℓ*-to-param bool x₀ x₁ (~bool x) = x
+  ~ℓ*-to-param (labeled u) (.(inj₁ _) , snd) (.(inj₁ _) , .snd) (~labeled₀ x) = refl , λ p → ⟦inj₁⟧ (~ℓ*-to-param u _ _ x)
+  ~ℓ*-to-param (labeled u) (.(inj₂ _) , snd) (.(inj₂ _) , .snd) ~labeled₂ = refl , λ p → ⟦inj₂⟧ refl
+  ~ℓ*-to-param (labeled u) (fst , snd) (fst₁ , .snd) (~labeled₃ x) = refl , λ p → ⊥-elim (x p)
+  ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ x₂ = ?
+  
+  param-to-~ℓ* : (u : Univ) → (x₀ x₁ : El u DIFC) → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁ → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ 
+  param-to-~ℓ* bool x₀ x₁ x = ~bool x
+  param-to-~ℓ* (labeled u) (fst , .(proj₂ x₁)) x₁ (refl , snd) with proj₂ x₁ ⊑d ℓ*
+  ... | no ¬p = ~labeled₃ ¬p
+  ... | yes p with snd p
+  ... | ⟦inj₁⟧ x = ~labeled₀ (param-to-~ℓ* u _ _ x)
+  ... | ⟦inj₂⟧ refl = ~labeled₂
+  param-to-~ℓ* (lio u) x₀ x₁ x = ~lio (λ ℓc₀ ℓc₁ p → param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ p (x ℓc₀ ℓc₁ {!   !}))
 
-    hlp₁ : _
-    hlp₁ = proj₁ assume , λ p → ⟦⊎⟧-refl (cong proj₁ (proj₂ assume p)) 
+  param-cfg-to-~ℓ* : (u : Univ)
+                   → (x₀ x₁ : LIO DIFC (El u DIFC))
+                   → (ℓc₀ ℓc₁ : L)
+                   → (ℓc₀ ~⟨ ℓ* ⟩L ℓc₁)
+                   → ( (proj₂ (proj₁ (x₀ ℓc₀)) ≡ proj₂ (proj₁ (x₁ ℓc₁)))
+                     × ((proj₂ (proj₁ (x₀ ℓc₀)) ⊑ ℓ*)
+                       × ((Rel u DIFC DIFC ⟦DIFC⟧ ⟦⊎⟧ _≡_) (proj₁ (proj₁ (x₀ ℓc₀))) (proj₁ (proj₁ (x₁ ℓc₁))))
+                       )
+                     )
+                   ⊎
+                     ( (proj₂ (proj₁ (x₀ ℓc₀)) ⊑ ℓ* → ⊥)
+                     × (proj₂ (proj₁ (x₁ ℓc₁)) ⊑ ℓ* → ⊥)
+                     )
+                   → u ⊢ proj₁ (x₀ ℓc₀) ~⟨ ℓ* ⟩Cfg proj₁ (x₁ ℓc₁)
+  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₁ (fst , fst₁ , snd)) with (proj₁ (x₀ ℓc₀)) | (proj₁ (x₁ ℓc₁))
+  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₁ (refl , fst₁ , ⟦inj₁⟧ x₄)) | inj₁ x₂ , snd₁ | inj₁ x₃ , snd₂ = ~cfg₀ (λ p → refl) fst₁ fst₁ (param-to-~ℓ* u x₂ x₃ x₄)
+  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₁ (refl , fst₁ , ⟦inj₂⟧ refl)) | inj₂ y , snd₁ | inj₂ y₁ , snd₂ = ~cfg₁ λ p → refl 
+  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₂ (fst , snd)) = ~cfg₂ (λ { (inj₁ p) → ⊥-elim (fst p) ; (inj₂ p) → ⊥-elim (snd p) }) (inj₁ fst)
 
-    hlp : ∀{lv₀ lv₁} → Cfgᵣ Bool Bool ⟦Bool⟧ (proj₁ (o DIFC lv₀ ℓc₀)) (proj₁ (o DIFC lv₁ ℓc₁)) → (proj₁ (o DIFC lv₀ ℓc₀)) ~⟨ ℓ* ⟩Cfg (proj₁ (o DIFC lv₁ ℓc₁))
-    hlp {lv₀} {lv₁} (inj₁ (fst , fst₁ , snd)) with (proj₁ (proj₁ (o DIFC lv₀ ℓc₀))) | (proj₁ (proj₁ (o DIFC lv₁ ℓc₁)))
-    hlp {lv₀} {lv₁} (inj₁ (fst , fst₁ , ⟦inj₁⟧ x₁)) | inj₁ x | inj₁ y = (λ p → fst) , λ p → cong inj₁ x₁
-    hlp {lv₀} {lv₁} (inj₁ (fst , fst₁ , ⟦inj₂⟧ x₁)) | inj₂ x | inj₂ y = (λ p → fst) , λ p → cong inj₂ x₁
-    hlp (inj₂ (fst , snd)) = (λ { (inj₁ x) → ⊥-elim (fst x) ; (inj₂ y) → ⊥-elim (snd y) }) , λ pr → ⊥-elim (fst (proj₁ pr))
+NI : (u₀ u₁ : Univ)
+   → (o : (m : LIOInterface) → El u₀ m → El u₁ m)
+   → (x₀ x₁ : El u₀ DIFC)
+   → u₀ ⊢ x₀ ~⟨ ℓ* ⟩ x₁
+   → u₁ ⊢ (o DIFC x₀) ~⟨ ℓ* ⟩ (o DIFC x₁)
+NI u₀ u₁ o x₀ x₁ x = param-to-~ℓ* u₁ (o DIFC x₀) (o DIFC x₁)
+                      (parametricity u₀ u₁ o DIFC DIFC ⟦DIFC⟧ x₀ x₁
+                        (~ℓ*-to-param u₀ x₀ x₁ x))
+
+

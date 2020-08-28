@@ -318,7 +318,6 @@ mutual
   ~ℓ*-to-param (labeled u) (fst , snd) (fst₁ , .snd) (~labeled₃ x) = refl , λ p → ⊥-elim (x p)
   ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ (inj₁ x₂) = ~ℓ*-cfg-to-param u x₀ x₁ ℓ₀ ℓ₁ (inj₁ x₂) (x ℓ₀ ℓ₁ λ p → x₂)
   ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ (inj₂ y) = ~ℓ*-cfg-to-param u x₀ x₁ ℓ₀ ℓ₁ (inj₂ y) (x ℓ₀ ℓ₁ λ { (inj₁ p) → ⊥-elim (proj₁ y p) ; (inj₂ p) → ⊥-elim (proj₂ y p) })
-    --
 
   ~ℓ*-cfg-to-param : (u : Univ)
                    → (x₀ x₁ : LIO DIFC (El u DIFC)) 

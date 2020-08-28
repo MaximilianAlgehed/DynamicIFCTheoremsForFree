@@ -316,7 +316,34 @@ mutual
   ~ℓ*-to-param (labeled u) (.(inj₁ _) , snd) (.(inj₁ _) , .snd) (~labeled₀ x) = refl , λ p → ⟦inj₁⟧ (~ℓ*-to-param u _ _ x)
   ~ℓ*-to-param (labeled u) (.(inj₂ _) , snd) (.(inj₂ _) , .snd) ~labeled₂ = refl , λ p → ⟦inj₂⟧ refl
   ~ℓ*-to-param (labeled u) (fst , snd) (fst₁ , .snd) (~labeled₃ x) = refl , λ p → ⊥-elim (x p)
-  ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ x₂ = ?
+  ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ (inj₁ x₂) = ~ℓ*-cfg-to-param u x₀ x₁ ℓ₀ ℓ₁ (inj₁ x₂) (x ℓ₀ ℓ₁ λ p → x₂)
+  ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ (inj₂ y) = ~ℓ*-cfg-to-param u x₀ x₁ ℓ₀ ℓ₁ (inj₂ y) (x ℓ₀ ℓ₁ λ { (inj₁ p) → ⊥-elim (proj₁ y p) ; (inj₂ p) → ⊥-elim (proj₂ y p) })
+    --
+
+  ~ℓ*-cfg-to-param : (u : Univ)
+                   → (x₀ x₁ : LIO DIFC (El u DIFC)) 
+                   → (ℓc₀ ℓc₁ : L)
+                   → ℓc₀ ≡ ℓc₁ ⊎ ((ℓc₀ ̷⊑ ℓ*) × (ℓc₁ ̷⊑ ℓ*))
+                   → u ⊢ proj₁ (x₀ ℓc₀) ~⟨ ℓ* ⟩Cfg proj₁ (x₁ ℓc₁)
+                   → ( (proj₂ (proj₁ (x₀ ℓc₀)) ≡ proj₂ (proj₁ (x₁ ℓc₁)))
+                     × ( (proj₂ (proj₁ (x₀ ℓc₀)) ⊑ ℓ*)
+                       × ((Rel u DIFC DIFC ⟦DIFC⟧ ⟦⊎⟧ _≡_) (proj₁ (proj₁ (x₀ ℓc₀)))
+                                                           (proj₁ (proj₁ (x₁ ℓc₁)))))
+                     ) ⊎ ( (proj₂ (proj₁ (x₀ ℓc₀)) ̷⊑ ℓ*)
+                         × (proj₂ (proj₁ (x₁ ℓc₁)) ̷⊑ ℓ*)
+                         )
+  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x x₂ with proj₁ (x₀ ℓc₀) | proj₁ (x₁ ℓc₁)
+  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₀ x₂ x₃ x₄ x₅) | .(inj₁ _) , snd | .(inj₁ _) , snd₁ = inj₁ (x₂ (inj₁ x₃) , x₃ , ⟦inj₁⟧ (~ℓ*-to-param u _ _ x₅))
+  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₁ x₂) | .(inj₂ _) , snd | .(inj₂ _) , snd₁ with snd ⊑d ℓ* | snd₁ ⊑d ℓ*
+  ... | yes p | r = inj₁ (x₂ (inj₁ p) , p , ⟦inj₂⟧ refl)
+  ... | no ¬p | yes p' = inj₂ (¬p , λ pr → ¬p (⊑-trans (⊑-eql (x₂ (inj₂ pr))) pr))
+  ... | no ¬p | no ¬p' = inj₂ (¬p , ¬p')
+  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₂ x₂ (inj₁ x₃)) | fst , snd | fst₁ , snd₁ with snd₁ ⊑d ℓ*
+  ... | yes p = inj₂ (x₃ , λ pr → x₃ (⊑-trans (⊑-eql (x₂ (inj₂ pr))) pr))
+  ... | no ¬p = inj₂ (x₃ , ¬p)
+  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₂ x₂ (inj₂ y)) | fst , snd | fst₁ , snd₁ with snd ⊑d ℓ*
+  ... | yes p = inj₂ ((λ pr → y (⊑-trans (⊑-eql (sym (x₂ (inj₁ pr)))) pr)) , y)
+  ... | no ¬p = inj₂ (¬p , y)
   
   param-to-~ℓ* : (u : Univ) → (x₀ x₁ : El u DIFC) → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁ → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ 
   param-to-~ℓ* bool x₀ x₁ x = ~bool x
@@ -325,7 +352,15 @@ mutual
   ... | yes p with snd p
   ... | ⟦inj₁⟧ x = ~labeled₀ (param-to-~ℓ* u _ _ x)
   ... | ⟦inj₂⟧ refl = ~labeled₂
-  param-to-~ℓ* (lio u) x₀ x₁ x = ~lio (λ ℓc₀ ℓc₁ p → param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ p (x ℓc₀ ℓc₁ {!   !}))
+  param-to-~ℓ* (lio u) x₀ x₁ x = ~lio (λ ℓc₀ ℓc₁ p → param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ p (x ℓc₀ ℓc₁ (hlp ℓc₀ ℓc₁ p)))
+
+  hlp : (ℓc₀ ℓc₁ : L)
+      → ((ℓc₀ ⊑ ℓ*) ⊎ (ℓc₁ ⊑ ℓ*) → ℓc₀ ≡ ℓc₁)
+      → ℓc₀ ≡ ℓc₁ ⊎ Σ (ℓc₀ ⊑ ℓ* → ⊥) (λ x₂ → ℓc₁ ⊑ ℓ* → ⊥)
+  hlp ℓc₀ ℓc₁ pr with ℓc₀ ⊑d ℓ* | ℓc₁ ⊑d ℓ*
+  ... | yes p | r     = inj₁ (pr (inj₁ p))
+  ... | no ¬p | no ¬q = inj₂ (¬p , ¬q)
+  ... | no ¬p | yes q = inj₁ (pr (inj₂ q))
 
   param-cfg-to-~ℓ* : (u : Univ)
                    → (x₀ x₁ : LIO DIFC (El u DIFC))

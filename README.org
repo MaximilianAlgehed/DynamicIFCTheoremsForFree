@@ -1,12 +1,12 @@
+|--------------------+------------------------------------------ |
 | Utils.agda         | General utility functions                 |
 | Param.agda         | Parametricity-specific utilities          |
 | Label.agda         | General definition of the Label structure |
-|--------------------------------------------------------------- |
+|--------------------+------------------------------------------ |
 | Booleans.agda      | Example in Paper: Booleans                |
 | BooleansWrong.agda | Example in Paper: Booleans, bad case      |
 | LIO.agda           | Example in Paper: LIO implementation      |
 | LIOProof.agda      | Example in Paper: LIO proof               |
 | MultefSimple.agda  | Example in Paper: Multef                  |
 | FIOSimple.agda     | Example in Paper: Effects                 |
-
-
+|--------------------+------------------------------------------ |

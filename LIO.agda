@@ -193,4 +193,3 @@ record ⟦LIOInterface⟧ (m₀ m₁ : LIOInterface) : Set₂ where
             → (cont₀ : E → LIO m₀ A₀) → (cont₁ : E → LIO m₁ A₁)
             → (contᵣ : (e₀ e₁ : E) → (eᵣ : Eᵣ e₀ e₁) → LIOᵣ A₀ A₁ Aᵣ (cont₀ e₀) (cont₁ e₁))
             → LIOᵣ A₀ A₁ Aᵣ (catch m₀ lio₀ cont₀) (catch m₁ lio₁ cont₁)
-

@@ -9,8 +9,10 @@ open import Relation.Unary
 open import Data.Sum
 open import Data.Empty
 open import Data.Product
-open import Data.Bool hiding (if_then_else_; _∧_)
+open import Data.Bool hiding (if_then_else_; _∧_; _≤_)
 open import Data.String
+open import Data.Nat
+open import Data.Nat.Properties hiding(⊔-comm)
 open import Param
 open import Utils
 open Label.Interface LABEL
@@ -248,22 +250,34 @@ open LIOInterface
 open ⟦LIOInterface⟧
 
 data Univ : Set where
-  bool : Univ
+  bool    : Univ
+  error   : Univ
+  nat     : Univ
   labeled : Univ → Univ
-  lio : Univ → Univ
+  lio     : Univ → Univ
+  _plus_  : Univ → Univ → Univ
+  _times_ : Univ → Univ → Univ
 
 El : Univ → LIOInterface → Set
-El bool m        = Bool
-El (labeled u) m = Labeled m (El u m)
-El (lio u) m     = LIO m (El u m)
+El bool m         = Bool
+El error m        = E
+El nat m          = ℕ
+El (labeled u) m  = Labeled m (El u m)
+El (lio u) m      = LIO m (El u m)
+El (u₀ plus u₁) m = El u₀ m ⊎ El u₁ m
+El (u₀ times u₁) m = El u₀ m × El u₁ m
 
 Rel : (u : Univ)
     → (m₀ : LIOInterface) → (m₁ : LIOInterface)
     → (mᵣ : ⟦LIOInterface⟧ m₀ m₁)
     → El u m₀ → El u m₁ → Set
-Rel bool m₀ m₁ mᵣ        = _≡_
-Rel (labeled u) m₀ m₁ mᵣ = Labeledᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
-Rel (lio u) m₀ m₁ mᵣ     = LIOᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
+Rel bool m₀ m₁ mᵣ          = _≡_
+Rel error m₀ m₁ mᵣ         = _≡_
+Rel nat m₀ m₁ mᵣ         = _≡_
+Rel (labeled u) m₀ m₁ mᵣ   = Labeledᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
+Rel (lio u) m₀ m₁ mᵣ       = LIOᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
+Rel (u₀ plus u₁) m₀ m₁ mᵣ  = (Rel u₀ m₀ m₁ mᵣ) ⟦⊎⟧ (Rel u₁ m₀ m₁ mᵣ)
+Rel (u₀ times u₁) m₀ m₁ mᵣ = (Rel u₀ m₀ m₁ mᵣ) ⟦×⟧ (Rel u₁ m₀ m₁ mᵣ)
 
 postulate parametricity : (u₀ u₁ : Univ)
                         → (o : (m : LIOInterface) → El u₀ m → El u₁ m)
@@ -275,118 +289,71 @@ postulate parametricity : (u₀ u₁ : Univ)
 _~⟨_⟩L_ : L → L → L → Set
 ℓc₀ ~⟨ ℓ ⟩L ℓc₁ = (ℓc₀ ⊑ ℓ) ⊎ (ℓc₁ ⊑ ℓ) → ℓc₀ ≡ ℓc₁
 
-mutual
-  data _⊢_~⟨_⟩_ : (u : Univ) → El u DIFC → L → El u DIFC → Set where
-    ~bool     : ∀{ℓ : L}{b₀ b₁ : Bool} → b₀ ≡ b₁ → bool ⊢ b₀ ~⟨ ℓ ⟩ b₁
-  
-    ~labeled₀ : ∀{ℓ ℓ' : L}{u : Univ}{v₀ v₁ : El u DIFC}
-              → u ⊢ v₀ ~⟨ ℓ ⟩ v₁
-              → (labeled u) ⊢ (inj₁ v₀ , ℓ') ~⟨ ℓ ⟩ (inj₁ v₁ , ℓ')
-  
-    ~labeled₂ : ∀{ℓ ℓ' : L}{u : Univ}{e : E}
-              → (labeled u) ⊢ (inj₂ e , ℓ') ~⟨ ℓ ⟩ (inj₂ e , ℓ')
-  
-    ~labeled₃ : ∀{ℓ ℓ' : L}{u : Univ}{v₀ v₁ : El u DIFC ⊎ E}
-              → ¬ (ℓ' ⊑ ℓ)
-              → (labeled u) ⊢ (v₀ , ℓ') ~⟨ ℓ ⟩ (v₁ , ℓ')
+_⊢_~⟨_⟩_ : (u : Univ) → El u DIFC → L → El u DIFC → Set
+bool ⊢ e₀ ~⟨ ℓ ⟩ e₁ = e₀ ≡ e₁
+error ⊢ e₀ ~⟨ ℓ ⟩ e₁ = e₀ ≡ e₁
+nat ⊢ e₀ ~⟨ ℓ ⟩ e₁ = e₀ ≡ e₁
+labeled u ⊢ (v₀ , ℓ₀) ~⟨ ℓ ⟩ (v₁ , ℓ₁) = ℓ₀ ≡ ℓ₁ × (ℓ₀ ⊑ ℓ → ((λ v₀ v₁ → u ⊢ v₀ ~⟨ ℓ ⟩ v₁) ⟦⊎⟧ _≡_) v₀ v₁)
+lio u ⊢ e₀ ~⟨ ℓ ⟩ e₁ = (ℓc₀ ℓc₁ : L)
+                     → ℓc₀ ~⟨ ℓ ⟩L ℓc₁
+                     → (proj₂ (proj₁ (e₀ ℓc₀)) ~⟨ ℓ ⟩L proj₂ (proj₁ (e₁ ℓc₁)))
+                     × (proj₂ (proj₁ (e₀ ℓc₀)) ⊑ ℓ
+                        → proj₂ (proj₁ (e₁ ℓc₁)) ⊑ ℓ
+                          → ((λ v₀ v₁ → u ⊢ v₀ ~⟨ ℓ ⟩ v₁) ⟦⊎⟧ (λ e₀ e₁ → e₀ ≡ e₁))
+                              (proj₁ (proj₁ (e₀ ℓc₀)))
+                              (proj₁ (proj₁ (e₁ ℓc₁))))
+(u plus u₁) ⊢ e₀ ~⟨ ℓ ⟩ e₁ = ((λ v₀ v₁ → u ⊢ v₀ ~⟨ ℓ ⟩ v₁) ⟦⊎⟧ (λ v₀ v₁ → u₁ ⊢ v₀ ~⟨ ℓ ⟩ v₁)) e₀ e₁
+(u times u₁) ⊢ e₀ ~⟨ ℓ ⟩ e₁ = ((λ v₀ v₁ → u ⊢ v₀ ~⟨ ℓ ⟩ v₁) ⟦×⟧ (λ v₀ v₁ → u₁ ⊢ v₀ ~⟨ ℓ ⟩ v₁)) e₀ e₁
 
-    ~lio      : ∀{ℓ : L}{u : Univ}{lio₀ lio₁ : LIO DIFC (El u DIFC)}
-              → ((ℓc₀ ℓc₁ : L) → ℓc₀ ~⟨ ℓ ⟩L ℓc₁ → u ⊢ proj₁ (lio₀ ℓc₀) ~⟨ ℓ ⟩Cfg proj₁ (lio₁ ℓc₁))
-              → (lio u) ⊢ lio₀ ~⟨ ℓ ⟩ lio₁
-  
-  data _⊢_~⟨_⟩Cfg_ : (u : Univ) → (El u DIFC ⊎ E) × L → L → (El u DIFC ⊎ E) × L → Set where
-    ~cfg₀ : ∀{ℓ : L}{u : Univ}{v₀ v₁ : El u DIFC}{ℓc₀ ℓc₁ : L}
-          → ℓc₀ ~⟨ ℓ ⟩L ℓc₁
-          → ℓc₀ ⊑ ℓ
-          → ℓc₁ ⊑ ℓ
-          → u ⊢ v₀ ~⟨ ℓ ⟩ v₁
-          → u ⊢ (inj₁ v₀ , ℓc₀) ~⟨ ℓ ⟩Cfg (inj₁ v₁ , ℓc₁)
+size : Univ → ℕ
+size bool = 1
+size error = 1
+size nat = 1
+size (labeled u) = 3 + size u
+size (lio u) = 3 + size u
+size (u plus u₁) = 1 + size u₁ + size u
+size (u times u₁) = 1 + size u + size u₁
 
-    ~cfg₁ : ∀{ℓ : L}{u : Univ}{e : E}{ℓc₀ ℓc₁ : L}
-          → ℓc₀ ~⟨ ℓ ⟩L ℓc₁
-          → u ⊢ (inj₂ e , ℓc₀) ~⟨ ℓ ⟩Cfg (inj₂ e , ℓc₁)
+~ℓ*-to-param : (u : Univ) → (n : ℕ) → n ≥ size u → (x₀ x₁ : El u DIFC) → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁
+~ℓ*-to-param bool n x x₀ x₁ x₂ = x₂
+~ℓ*-to-param error n x x₀ x₁ x₂ = x₂
+~ℓ*-to-param nat n x x₀ x₁ x₂ = x₂
+~ℓ*-to-param (labeled u) (suc n) (s≤s x) x₀ x₁ x₂ = proj₁ x₂ , λ pr → ~ℓ*-to-param (u plus error) n x _ _ (proj₂ x₂ pr)
+~ℓ*-to-param (lio u) (suc n) (s≤s x) x₀ x₁ x₂ ℓ₀ .ℓ₀ (inj₁ refl) with proj₂ (proj₁ (x₀ ℓ₀)) ⊑d ℓ* | proj₂ (proj₁ (x₁ ℓ₀)) ⊑d ℓ*
+... | yes p | yes q = inj₁ (proj₁ (x₂ ℓ₀ ℓ₀ (λ pr → refl)) (inj₁ p) , p , ~ℓ*-to-param (u plus error) n x (proj₁ (proj₁ (x₀ ℓ₀))) (proj₁ (proj₁ (x₁ ℓ₀))) (proj₂ (x₂ ℓ₀ ℓ₀ (λ pr → refl)) p q))
+... | yes p | no ¬q = inj₂ ((λ pr → ¬q (⊑-trans (⊑-eql (sym (proj₁ (x₂ ℓ₀ ℓ₀ (λ prf → refl)) (inj₁ p)))) p)) , ¬q)
+... | no ¬p | yes q = inj₂ (¬p , λ pr → ¬p (⊑-trans (⊑-eql (proj₁ (x₂ ℓ₀ ℓ₀ (λ pr → refl)) (inj₂ q))) q))
+... | no ¬p | no ¬q = inj₂ (¬p , ¬q)
+~ℓ*-to-param (lio u) n x x₀ x₁ x₂ ℓ₀ ℓ₁ (inj₂ y) = inj₂ ((λ pr → proj₁ y (⊑-trans (proj₂ (x₀ ℓ₀)) pr)) , λ pr → proj₂ y (⊑-trans (proj₂ (x₁ ℓ₁)) pr))
+~ℓ*-to-param (u plus u₁) n x .(inj₁ _) .(inj₁ _) (⟦inj₁⟧ x₁) = ⟦inj₁⟧ (~ℓ*-to-param u n (≤-trans (≤-trans (m≤n+m _ _) (n≤1+n (size u₁ + size u))) x) _ _ x₁)
+~ℓ*-to-param (u plus u₁) n x .(inj₂ _) .(inj₂ _) (⟦inj₂⟧ x₁) = ⟦inj₂⟧ (~ℓ*-to-param u₁ n (≤-trans (≤-trans (m≤m+n _ _) (n≤1+n _)) x) _ _ x₁)
+~ℓ*-to-param (u times u₁) (suc n) (s≤s x) x₀ x₁ x₂ = ~ℓ*-to-param u n (≤-trans (m≤m+n (size u) (size u₁)) x) _ _ (proj₁ x₂) , ~ℓ*-to-param u₁ n (≤-trans (m≤n+m (size u₁) (size u)) x) _ _ (proj₂ x₂)
 
-    ~cfg₂ : ∀{ℓ : L}{u : Univ}{v₀ v₁ : El u DIFC ⊎ E}{ℓc₀ ℓc₁ : L}
-          → (ℓc₀ ~⟨ ℓ ⟩L ℓc₁)
-          → (¬ (ℓc₀ ⊑ ℓ)) ⊎ (¬ (ℓc₁ ⊑ ℓ))
-          → u ⊢ (v₀ , ℓc₀) ~⟨ ℓ ⟩Cfg (v₁ , ℓc₁)
+hlp : (ℓc₀ ℓc₁ : L)
+    → ((ℓc₀ ⊑ ℓ*) ⊎ (ℓc₁ ⊑ ℓ*) → ℓc₀ ≡ ℓc₁)
+    → ℓc₀ ≡ ℓc₁ ⊎ Σ (ℓc₀ ⊑ ℓ* → ⊥) (λ x₂ → ℓc₁ ⊑ ℓ* → ⊥)
+hlp ℓc₀ ℓc₁ pr with ℓc₀ ⊑d ℓ* | ℓc₁ ⊑d ℓ*
+... | yes p | r     = inj₁ (pr (inj₁ p))
+... | no ¬p | no ¬q = inj₂ (¬p , ¬q)
+... | no ¬p | yes q = inj₁ (pr (inj₂ q))
 
-  ~ℓ*-to-param : (u : Univ) → (x₀ x₁ : El u DIFC) → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁
-  ~ℓ*-to-param bool x₀ x₁ (~bool x) = x
-  ~ℓ*-to-param (labeled u) (.(inj₁ _) , snd) (.(inj₁ _) , .snd) (~labeled₀ x) = refl , λ p → ⟦inj₁⟧ (~ℓ*-to-param u _ _ x)
-  ~ℓ*-to-param (labeled u) (.(inj₂ _) , snd) (.(inj₂ _) , .snd) ~labeled₂ = refl , λ p → ⟦inj₂⟧ refl
-  ~ℓ*-to-param (labeled u) (fst , snd) (fst₁ , .snd) (~labeled₃ x) = refl , λ p → ⊥-elim (x p)
-  ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ (inj₁ x₂) = ~ℓ*-cfg-to-param u x₀ x₁ ℓ₀ ℓ₁ (inj₁ x₂) (x ℓ₀ ℓ₁ λ p → x₂)
-  ~ℓ*-to-param (lio u) x₀ x₁ (~lio x) ℓ₀ ℓ₁ (inj₂ y) = ~ℓ*-cfg-to-param u x₀ x₁ ℓ₀ ℓ₁ (inj₂ y) (x ℓ₀ ℓ₁ λ { (inj₁ p) → ⊥-elim (proj₁ y p) ; (inj₂ p) → ⊥-elim (proj₂ y p) })
-
-  ~ℓ*-cfg-to-param : (u : Univ)
-                   → (x₀ x₁ : LIO DIFC (El u DIFC)) 
-                   → (ℓc₀ ℓc₁ : L)
-                   → ℓc₀ ≡ ℓc₁ ⊎ ((ℓc₀ ̷⊑ ℓ*) × (ℓc₁ ̷⊑ ℓ*))
-                   → u ⊢ proj₁ (x₀ ℓc₀) ~⟨ ℓ* ⟩Cfg proj₁ (x₁ ℓc₁)
-                   → ( (proj₂ (proj₁ (x₀ ℓc₀)) ≡ proj₂ (proj₁ (x₁ ℓc₁)))
-                     × ( (proj₂ (proj₁ (x₀ ℓc₀)) ⊑ ℓ*)
-                       × ((Rel u DIFC DIFC ⟦DIFC⟧ ⟦⊎⟧ _≡_) (proj₁ (proj₁ (x₀ ℓc₀)))
-                                                           (proj₁ (proj₁ (x₁ ℓc₁)))))
-                     ) ⊎ ( (proj₂ (proj₁ (x₀ ℓc₀)) ̷⊑ ℓ*)
-                         × (proj₂ (proj₁ (x₁ ℓc₁)) ̷⊑ ℓ*)
-                         )
-  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x x₂ with proj₁ (x₀ ℓc₀) | proj₁ (x₁ ℓc₁)
-  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₀ x₂ x₃ x₄ x₅) | .(inj₁ _) , snd | .(inj₁ _) , snd₁ = inj₁ (x₂ (inj₁ x₃) , x₃ , ⟦inj₁⟧ (~ℓ*-to-param u _ _ x₅))
-  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₁ x₂) | .(inj₂ _) , snd | .(inj₂ _) , snd₁ with snd ⊑d ℓ* | snd₁ ⊑d ℓ*
-  ... | yes p | r = inj₁ (x₂ (inj₁ p) , p , ⟦inj₂⟧ refl)
-  ... | no ¬p | yes p' = inj₂ (¬p , λ pr → ¬p (⊑-trans (⊑-eql (x₂ (inj₂ pr))) pr))
-  ... | no ¬p | no ¬p' = inj₂ (¬p , ¬p')
-  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₂ x₂ (inj₁ x₃)) | fst , snd | fst₁ , snd₁ with snd₁ ⊑d ℓ*
-  ... | yes p = inj₂ (x₃ , λ pr → x₃ (⊑-trans (⊑-eql (x₂ (inj₂ pr))) pr))
-  ... | no ¬p = inj₂ (x₃ , ¬p)
-  ~ℓ*-cfg-to-param u x₀ x₁ ℓc₀ ℓc₁ x (~cfg₂ x₂ (inj₂ y)) | fst , snd | fst₁ , snd₁ with snd ⊑d ℓ*
-  ... | yes p = inj₂ ((λ pr → y (⊑-trans (⊑-eql (sym (x₂ (inj₁ pr)))) pr)) , y)
-  ... | no ¬p = inj₂ (¬p , y)
-  
-  param-to-~ℓ* : (u : Univ) → (x₀ x₁ : El u DIFC) → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁ → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ 
-  param-to-~ℓ* bool x₀ x₁ x = ~bool x
-  param-to-~ℓ* (labeled u) (fst , .(proj₂ x₁)) x₁ (refl , snd) with proj₂ x₁ ⊑d ℓ*
-  ... | no ¬p = ~labeled₃ ¬p
-  ... | yes p with snd p
-  ... | ⟦inj₁⟧ x = ~labeled₀ (param-to-~ℓ* u _ _ x)
-  ... | ⟦inj₂⟧ refl = ~labeled₂
-  param-to-~ℓ* (lio u) x₀ x₁ x = ~lio (λ ℓc₀ ℓc₁ p → param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ p (x ℓc₀ ℓc₁ (hlp ℓc₀ ℓc₁ p)))
-
-  hlp : (ℓc₀ ℓc₁ : L)
-      → ((ℓc₀ ⊑ ℓ*) ⊎ (ℓc₁ ⊑ ℓ*) → ℓc₀ ≡ ℓc₁)
-      → ℓc₀ ≡ ℓc₁ ⊎ Σ (ℓc₀ ⊑ ℓ* → ⊥) (λ x₂ → ℓc₁ ⊑ ℓ* → ⊥)
-  hlp ℓc₀ ℓc₁ pr with ℓc₀ ⊑d ℓ* | ℓc₁ ⊑d ℓ*
-  ... | yes p | r     = inj₁ (pr (inj₁ p))
-  ... | no ¬p | no ¬q = inj₂ (¬p , ¬q)
-  ... | no ¬p | yes q = inj₁ (pr (inj₂ q))
-
-  param-cfg-to-~ℓ* : (u : Univ)
-                   → (x₀ x₁ : LIO DIFC (El u DIFC))
-                   → (ℓc₀ ℓc₁ : L)
-                   → (ℓc₀ ~⟨ ℓ* ⟩L ℓc₁)
-                   → ( (proj₂ (proj₁ (x₀ ℓc₀)) ≡ proj₂ (proj₁ (x₁ ℓc₁)))
-                     × ((proj₂ (proj₁ (x₀ ℓc₀)) ⊑ ℓ*)
-                       × ((Rel u DIFC DIFC ⟦DIFC⟧ ⟦⊎⟧ _≡_) (proj₁ (proj₁ (x₀ ℓc₀))) (proj₁ (proj₁ (x₁ ℓc₁))))
-                       )
-                     )
-                   ⊎
-                     ( (proj₂ (proj₁ (x₀ ℓc₀)) ⊑ ℓ* → ⊥)
-                     × (proj₂ (proj₁ (x₁ ℓc₁)) ⊑ ℓ* → ⊥)
-                     )
-                   → u ⊢ proj₁ (x₀ ℓc₀) ~⟨ ℓ* ⟩Cfg proj₁ (x₁ ℓc₁)
-  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₁ (fst , fst₁ , snd)) with (proj₁ (x₀ ℓc₀)) | (proj₁ (x₁ ℓc₁))
-  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₁ (refl , fst₁ , ⟦inj₁⟧ x₄)) | inj₁ x₂ , snd₁ | inj₁ x₃ , snd₂ = ~cfg₀ (λ p → refl) fst₁ fst₁ (param-to-~ℓ* u x₂ x₃ x₄)
-  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₁ (refl , fst₁ , ⟦inj₂⟧ refl)) | inj₂ y , snd₁ | inj₂ y₁ , snd₂ = ~cfg₁ λ p → refl 
-  param-cfg-to-~ℓ* u x₀ x₁ ℓc₀ ℓc₁ x (inj₂ (fst , snd)) = ~cfg₂ (λ { (inj₁ p) → ⊥-elim (fst p) ; (inj₂ p) → ⊥-elim (snd p) }) (inj₁ fst)
+param-to-~ℓ* : (u : Univ) → (n : ℕ) → (size u ≤ n) → (x₀ x₁ : El u DIFC) → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁ → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ 
+param-to-~ℓ* bool n x x₀ x₁ x₂ = x₂
+param-to-~ℓ* error n x x₀ x₁ x₂ = x₂
+param-to-~ℓ* nat n x x₀ x₁ x₂ = x₂
+param-to-~ℓ* (labeled u) (suc n) (s≤s x) x₀ x₁ x₂ = proj₁ x₂ , λ pr → param-to-~ℓ* (u plus error) n x _ _ (proj₂ x₂ pr)
+param-to-~ℓ* (lio u) n x x₀ x₁ x₂ ℓc₀ ℓc₁ x₃ with x₂ ℓc₀ ℓc₁ (hlp ℓc₀ ℓc₁ x₃)
+param-to-~ℓ* (lio u) (suc n) (s≤s x) x₀ x₁ x₂ ℓc₀ ℓc₁ x₃ | inj₁ x₄ = (λ pr → proj₁ x₄) , λ p q → param-to-~ℓ* (u plus error) n x _ _ (proj₂ (proj₂ x₄))
+param-to-~ℓ* (lio u) n x x₀ x₁ x₂ ℓc₀ ℓc₁ x₃ | inj₂ y = (λ { (inj₁ p) → ⊥-elim (proj₁ y p) ; (inj₂ q) → ⊥-elim (proj₂ y q) }) , λ pr → ⊥-elim (proj₁ y pr)
+param-to-~ℓ* (u plus u₁) (suc n) (s≤s x) .(inj₁ _) .(inj₁ _) (⟦inj₁⟧ x₁) = ⟦inj₁⟧ (param-to-~ℓ* u n (≤-trans (m≤n+m _ _) x) _ _ x₁)
+param-to-~ℓ* (u plus u₁) (suc n) (s≤s x) .(inj₂ _) .(inj₂ _) (⟦inj₂⟧ x₁) = ⟦inj₂⟧ (param-to-~ℓ* u₁ n (≤-trans (m≤m+n _ _) x) _ _ x₁)
+param-to-~ℓ* (u times u₁) (suc n) (s≤s x) x₀ x₁ x₂ = param-to-~ℓ* u n (≤-trans (m≤m+n _ _) x) _ _ (proj₁ x₂) , param-to-~ℓ* u₁ n (≤-trans (m≤n+m _ _) x) _ _ (proj₂ x₂)
 
 NI : (u₀ u₁ : Univ)
    → (o : (m : LIOInterface) → El u₀ m → El u₁ m)
    → (x₀ x₁ : El u₀ DIFC)
    → u₀ ⊢ x₀ ~⟨ ℓ* ⟩ x₁
    → u₁ ⊢ (o DIFC x₀) ~⟨ ℓ* ⟩ (o DIFC x₁)
-NI u₀ u₁ o x₀ x₁ x = param-to-~ℓ* u₁ (o DIFC x₀) (o DIFC x₁)
+NI u₀ u₁ o x₀ x₁ x = param-to-~ℓ* u₁ (size u₁) ≤-refl (o DIFC x₀) (o DIFC x₁)
                       (parametricity u₀ u₁ o DIFC DIFC ⟦DIFC⟧ x₀ x₁
-                        (~ℓ*-to-param u₀ x₀ x₁ x))
-
-
+                        (~ℓ*-to-param u₀ (size u₀) ≤-refl x₀ x₁ x))

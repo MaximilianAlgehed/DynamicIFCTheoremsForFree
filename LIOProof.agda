@@ -258,38 +258,38 @@ data Univ : Set where
   _plus_  : Univ → Univ → Univ
   _times_ : Univ → Univ → Univ
 
-El : Univ → LIOInterface → Set
-El bool m         = Bool
-El error m        = E
-El nat m          = ℕ
-El (labeled u) m  = Labeled m (El u m)
-El (lio u) m      = LIO m (El u m)
-El (u₀ plus u₁) m = El u₀ m ⊎ El u₁ m
-El (u₀ times u₁) m = El u₀ m × El u₁ m
+El : LIOInterface → Univ → Set
+El m bool          = Bool
+El m error         = E
+El m nat           = ℕ
+El m (labeled u)   = Labeled m (El m u)
+El m (lio u)       = LIO m (El m u)
+El m (u₀ plus u₁)  = El m u₀ ⊎ El m u₁
+El m (u₀ times u₁) = El m u₀ × El m u₁
 
 Rel : (u : Univ)
     → (m₀ : LIOInterface) → (m₁ : LIOInterface)
     → (mᵣ : ⟦LIOInterface⟧ m₀ m₁)
-    → El u m₀ → El u m₁ → Set
+    → El m₀ u → El m₁ u → Set
 Rel bool m₀ m₁ mᵣ          = _≡_
 Rel error m₀ m₁ mᵣ         = _≡_
 Rel nat m₀ m₁ mᵣ         = _≡_
-Rel (labeled u) m₀ m₁ mᵣ   = Labeledᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
-Rel (lio u) m₀ m₁ mᵣ       = LIOᵣ mᵣ (El u m₀) (El u m₁) (Rel u m₀ m₁ mᵣ)
+Rel (labeled u) m₀ m₁ mᵣ   = Labeledᵣ mᵣ (El m₀ u) (El m₁ u) (Rel u m₀ m₁ mᵣ)
+Rel (lio u) m₀ m₁ mᵣ       = LIOᵣ mᵣ (El m₀ u) (El m₁ u) (Rel u m₀ m₁ mᵣ)
 Rel (u₀ plus u₁) m₀ m₁ mᵣ  = (Rel u₀ m₀ m₁ mᵣ) ⟦⊎⟧ (Rel u₁ m₀ m₁ mᵣ)
 Rel (u₀ times u₁) m₀ m₁ mᵣ = (Rel u₀ m₀ m₁ mᵣ) ⟦×⟧ (Rel u₁ m₀ m₁ mᵣ)
 
 postulate parametricity : (u₀ u₁ : Univ)
-                        → (o : (m : LIOInterface) → El u₀ m → El u₁ m)
+                        → (o : (m : LIOInterface) → El m u₀ → El m u₁)
                         → (m₀ m₁ : LIOInterface) → (mᵣ : ⟦LIOInterface⟧ m₀ m₁)
-                        → (i₀ : El u₀ m₀) → (i₁ : El u₀ m₁)
+                        → (i₀ : El m₀ u₀) → (i₁ : El m₁ u₀)
                         → (iᵣ : Rel u₀ m₀ m₁ mᵣ i₀ i₁)
                         → Rel u₁ m₀ m₁ mᵣ (o m₀ i₀) (o m₁ i₁)
 
 _~⟨_⟩L_ : L → L → L → Set
 ℓc₀ ~⟨ ℓ ⟩L ℓc₁ = (ℓc₀ ⊑ ℓ) ⊎ (ℓc₁ ⊑ ℓ) → ℓc₀ ≡ ℓc₁
 
-_⊢_~⟨_⟩_ : (u : Univ) → El u DIFC → L → El u DIFC → Set
+_⊢_~⟨_⟩_ : (u : Univ) → El DIFC u → L → El DIFC u → Set
 bool ⊢ e₀ ~⟨ ℓ ⟩ e₁ = e₀ ≡ e₁
 error ⊢ e₀ ~⟨ ℓ ⟩ e₁ = e₀ ≡ e₁
 nat ⊢ e₀ ~⟨ ℓ ⟩ e₁ = e₀ ≡ e₁
@@ -314,7 +314,7 @@ size (lio u) = 3 + size u
 size (u plus u₁) = 1 + size u₁ + size u
 size (u times u₁) = 1 + size u + size u₁
 
-~ℓ*-to-param : (u : Univ) → (n : ℕ) → n ≥ size u → (x₀ x₁ : El u DIFC) → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁
+~ℓ*-to-param : (u : Univ) → (n : ℕ) → n ≥ size u → (x₀ x₁ : El DIFC u) → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁
 ~ℓ*-to-param bool n x x₀ x₁ x₂ = x₂
 ~ℓ*-to-param error n x x₀ x₁ x₂ = x₂
 ~ℓ*-to-param nat n x x₀ x₁ x₂ = x₂
@@ -337,7 +337,7 @@ hlp ℓc₀ ℓc₁ pr with ℓc₀ ⊑d ℓ* | ℓc₁ ⊑d ℓ*
 ... | no ¬p | no ¬q = inj₂ (¬p , ¬q)
 ... | no ¬p | yes q = inj₁ (pr (inj₂ q))
 
-param-to-~ℓ* : (u : Univ) → (n : ℕ) → (size u ≤ n) → (x₀ x₁ : El u DIFC) → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁ → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ 
+param-to-~ℓ* : (u : Univ) → (n : ℕ) → (size u ≤ n) → (x₀ x₁ : El DIFC u) → Rel u DIFC DIFC ⟦DIFC⟧ x₀ x₁ → u ⊢ x₀ ~⟨ ℓ* ⟩ x₁ 
 param-to-~ℓ* bool n x x₀ x₁ x₂ = x₂
 param-to-~ℓ* error n x x₀ x₁ x₂ = x₂
 param-to-~ℓ* nat n x x₀ x₁ x₂ = x₂
@@ -350,8 +350,8 @@ param-to-~ℓ* (u plus u₁) (suc n) (s≤s x) .(inj₂ _) .(inj₂ _) (⟦inj�
 param-to-~ℓ* (u times u₁) (suc n) (s≤s x) x₀ x₁ x₂ = param-to-~ℓ* u n (≤-trans (m≤m+n _ _) x) _ _ (proj₁ x₂) , param-to-~ℓ* u₁ n (≤-trans (m≤n+m _ _) x) _ _ (proj₂ x₂)
 
 NI : (u₀ u₁ : Univ)
-   → (o : (m : LIOInterface) → El u₀ m → El u₁ m)
-   → (x₀ x₁ : El u₀ DIFC)
+   → (o : (m : LIOInterface) → El m u₀ → El m u₁)
+   → (x₀ x₁ : El DIFC u₀)
    → u₀ ⊢ x₀ ~⟨ ℓ* ⟩ x₁
    → u₁ ⊢ (o DIFC x₀) ~⟨ ℓ* ⟩ (o DIFC x₁)
 NI u₀ u₁ o x₀ x₁ x = param-to-~ℓ* u₁ (size u₁) ≤-refl (o DIFC x₀) (o DIFC x₁)
